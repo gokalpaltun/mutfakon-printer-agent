@@ -11,7 +11,7 @@ import (
 	"strings"
 )
 
-const version = "0.2.0"
+const version = "0.2.1"
 
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
@@ -28,6 +28,14 @@ func writeJSON(w http.ResponseWriter, status int, body any) {
 
 func handler(allowed []string) http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/" {
+			writeJSON(w, 404, map[string]any{"error": "NOT_FOUND"})
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		_, _ = w.Write([]byte(testPageHTML))
+	})
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"ok": true, "version": version, "platform": runtime.GOOS})
 	})
@@ -89,7 +97,9 @@ func handler(allowed []string) http.Handler {
 
 func main() {
 	port := env("AGENT_PORT", "9187")
-	allowed := strings.Split(env("AGENT_ORIGINS", "http://localhost:5280,http://mutfakon-portal.trackallops.com,https://mutfakon-portal.trackallops.com"), ",")
+	// The agent's own page calls it too (same origin).
+	allowed := []string{"http://127.0.0.1:" + port, "http://localhost:" + port}
+	allowed = append(allowed, strings.Split(env("AGENT_ORIGINS", "http://localhost:5280,http://mutfakon-portal.trackallops.com,https://mutfakon-portal.trackallops.com"), ",")...)
 	addr := "127.0.0.1:" + port
 	fmt.Printf("Mutfak On printer agent %s on http://%s\n", version, addr)
 	log.Fatal(http.ListenAndServe(addr, handler(allowed)))
