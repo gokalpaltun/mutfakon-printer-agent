@@ -9,7 +9,8 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "bundle": "esbuild src/index.ts --bundle --platform=node --target=node22 --format=cjs --outfile=dist/agent.cjs",
-    "build:win": "npm run bundle && pkg dist/agent.cjs --targets node22-win-x64 --output dist/mutfakon-printer-agent.exe"
+    "build:win": "npm run bundle && pkg dist/agent.cjs --targets node22-win-x64 --output dist/mutfakon-printer-agent.exe",
+    "build:win-go": "cd go && GOOS=windows GOARCH=amd64 go build -ldflags \"-s -w -H=windowsgui\" -o ../dist/mutfakon-printer-agent-go.exe ."
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

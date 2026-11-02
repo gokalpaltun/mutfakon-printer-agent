@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-const version = "0.2.3"
+const version = "0.2.4"
 
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
@@ -158,6 +158,7 @@ func main() {
 	// The agent's own page calls it too (same origin).
 	allowed := []string{"http://127.0.0.1:" + port, "http://localhost:" + port}
 	allowed = append(allowed, strings.Split(env("AGENT_ORIGINS", "http://localhost:5280,http://mutfakon-portal.trackallops.com,https://mutfakon-portal.trackallops.com"), ",")...)
+	registerAutostart()
 	addr := "127.0.0.1:" + port
 	fmt.Printf("Mutfak On printer agent %s on http://%s\n", version, addr)
 	log.Fatal(http.ListenAndServe(addr, handler(allowed)))
