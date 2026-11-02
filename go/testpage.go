@@ -29,17 +29,19 @@ fetch('/printers').then(r => r.json()).then(d => {
     const meta = document.createElement('small'); meta.textContent = [p.port, p.driver, p.isDefault ? 'varsayılan' : ''].filter(Boolean).join(' · ');
     info.append(name, meta);
     const msg = document.createElement('span'); msg.className = 'msg';
-    const btn = document.createElement('button'); btn.textContent = 'Test fişi bas';
+    const mk = (label, path) => {
+    const btn = document.createElement('button'); btn.textContent = label;
     btn.onclick = async () => {
       btn.disabled = true; msg.textContent = ''; msg.className = 'msg';
       try {
-        const r = await fetch('/test-print', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ printer: p.name }) });
+        const r = await fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ printer: p.name }) });
         const j = await r.json();
         if (j.ok) { msg.textContent = 'Gönderildi'; msg.className = 'msg ok'; } else { msg.textContent = (j.error || 'Hata') + ': ' + (j.message || ''); msg.className = 'msg err'; }
       } catch (e) { msg.textContent = 'Ulaşılamadı'; msg.className = 'msg err'; }
       btn.disabled = false;
     };
-    card.append(info, msg, btn); list.append(card);
+    return btn; };
+    card.append(info, msg, mk('Test fişi bas', '/test-print'), mk('Zor test fişi', '/test-print-hard')); list.append(card);
   });
 }).catch(() => { list.textContent = 'Yazıcılar okunamadı.'; });
 </script></body></html>`

@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-const version = "0.2.2"
+const version = "0.2.3"
 
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
@@ -77,6 +77,29 @@ func handler(allowed []string) http.Handler {
 		}
 		if err := printRaw(body.Printer, job); err != nil {
 			log.Printf("print failed: %v", err)
+			writeJSON(w, 500, map[string]any{"error": "PRINT_FAILED", "message": err.Error()})
+			return
+		}
+		writeJSON(w, 200, map[string]any{"ok": true})
+	})
+	mux.HandleFunc("/test-print-hard", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, 405, map[string]any{"error": "METHOD_NOT_ALLOWED"})
+			return
+		}
+		var body struct {
+			Printer string `json:"printer"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Printer == "" {
+			writeJSON(w, 400, map[string]any{"error": "PRINTER_REQUIRED"})
+			return
+		}
+		job, err := hardTestReceipt(1)
+		if err == nil {
+			err = printRaw(body.Printer, job)
+		}
+		if err != nil {
+			log.Printf("hard test print failed: %v", err)
 			writeJSON(w, 500, map[string]any{"error": "PRINT_FAILED", "message": err.Error()})
 			return
 		}
