@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -38,4 +39,36 @@ func testReceipt(printerName string) []byte {
 	b.WriteString("\n\n\n\n")
 	b.Write([]byte{gs, 0x56, 66, 0}) // feed and partial cut
 	return b.Bytes()
+}
+
+// rasterReceipt builds the print job for a receipt that arrives as a 1-bit bitmap (rows of width/8 bytes,
+// most significant bit = leftmost dot, 1 = black). The bitmap goes out in bands (GS v 0) because some printers
+// have a small receive buffer; every copy ends with a feed and a cut.
+func rasterReceipt(width, height int, data []byte, copies int) ([]byte, error) {
+	if width <= 0 || width%8 != 0 || width > 1024 || height <= 0 || height > 10000 {
+		return nil, fmt.Errorf("bad bitmap size %dx%d", width, height)
+	}
+	rowBytes := width / 8
+	if len(data) != rowBytes*height {
+		return nil, fmt.Errorf("bitmap has %d bytes, expected %d", len(data), rowBytes*height)
+	}
+	if copies < 1 || copies > 7 {
+		return nil, fmt.Errorf("copies must be 1-7")
+	}
+	const band = 128
+	var b bytes.Buffer
+	for c := 0; c < copies; c++ {
+		b.Write([]byte{esc, 0x40}) // initialize
+		for y := 0; y < height; y += band {
+			n := band
+			if y+n > height {
+				n = height - y
+			}
+			b.Write([]byte{gs, 0x76, 0x30, 0, byte(rowBytes), byte(rowBytes >> 8), byte(n), byte(n >> 8)})
+			b.Write(data[y*rowBytes : (y+n)*rowBytes])
+		}
+		b.WriteString("\n\n\n")
+		b.Write([]byte{gs, 0x56, 66, 0}) // feed and partial cut
+	}
+	return b.Bytes(), nil
 }

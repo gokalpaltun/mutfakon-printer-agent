@@ -2,6 +2,7 @@
 package main
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -11,7 +12,7 @@ import (
 	"strings"
 )
 
-const version = "0.2.1"
+const version = "0.2.2"
 
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
@@ -46,6 +47,40 @@ func handler(allowed []string) http.Handler {
 			return
 		}
 		writeJSON(w, 200, map[string]any{"printers": printers})
+	})
+	mux.HandleFunc("/print", func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			writeJSON(w, 405, map[string]any{"error": "METHOD_NOT_ALLOWED"})
+			return
+		}
+		r.Body = http.MaxBytesReader(w, r.Body, 4<<20)
+		var body struct {
+			Printer string `json:"printer"`
+			Copies  int    `json:"copies"`
+			Width   int    `json:"width"`
+			Height  int    `json:"height"`
+			Data    string `json:"data"` // base64, 1 bit per dot
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Printer == "" {
+			writeJSON(w, 400, map[string]any{"error": "BAD_REQUEST"})
+			return
+		}
+		bitmap, err := base64.StdEncoding.DecodeString(body.Data)
+		if err != nil {
+			writeJSON(w, 400, map[string]any{"error": "BAD_BITMAP"})
+			return
+		}
+		job, err := rasterReceipt(body.Width, body.Height, bitmap, body.Copies)
+		if err != nil {
+			writeJSON(w, 400, map[string]any{"error": "BAD_BITMAP", "message": err.Error()})
+			return
+		}
+		if err := printRaw(body.Printer, job); err != nil {
+			log.Printf("print failed: %v", err)
+			writeJSON(w, 500, map[string]any{"error": "PRINT_FAILED", "message": err.Error()})
+			return
+		}
+		writeJSON(w, 200, map[string]any{"ok": true})
 	})
 	mux.HandleFunc("/test-print", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
