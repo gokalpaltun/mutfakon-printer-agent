@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-const version = "0.2.4"
+const version = "0.3.0"
 
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
@@ -41,12 +41,46 @@ func handler(allowed []string) http.Handler {
 		writeJSON(w, 200, map[string]any{"ok": true, "version": version, "platform": runtime.GOOS})
 	})
 	mux.HandleFunc("/printers", func(w http.ResponseWriter, r *http.Request) {
-		printers, err := listPrinters()
+		printers, err := allPrinters()
 		if err != nil {
 			writeJSON(w, 500, map[string]any{"error": "LIST_FAILED", "message": err.Error()})
 			return
 		}
 		writeJSON(w, 200, map[string]any{"printers": printers})
+	})
+	mux.HandleFunc("/printers/discover", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]any{"found": discoverNetPrinters()})
+	})
+	mux.HandleFunc("/printers/network", func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodPost:
+			var body struct {
+				Host string `json:"host"`
+				Port int    `json:"port"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				writeJSON(w, 400, map[string]any{"error": "BAD_REQUEST"})
+				return
+			}
+			name, err := addNetPrinter(body.Host, body.Port)
+			if err != nil {
+				status := 500
+				if err.Error() == "INVALID_ADDRESS" || err.Error() == "UNREACHABLE" {
+					status = 400
+				}
+				writeJSON(w, status, map[string]any{"error": err.Error()})
+				return
+			}
+			writeJSON(w, 200, map[string]any{"ok": true, "name": name})
+		case http.MethodDelete:
+			if err := removeNetPrinter(r.URL.Query().Get("name")); err != nil {
+				writeJSON(w, 500, map[string]any{"error": "REMOVE_FAILED", "message": err.Error()})
+				return
+			}
+			writeJSON(w, 200, map[string]any{"ok": true})
+		default:
+			writeJSON(w, 405, map[string]any{"error": "METHOD_NOT_ALLOWED"})
+		}
 	})
 	mux.HandleFunc("/print", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -75,7 +109,7 @@ func handler(allowed []string) http.Handler {
 			writeJSON(w, 400, map[string]any{"error": "BAD_BITMAP", "message": err.Error()})
 			return
 		}
-		if err := printRaw(body.Printer, job); err != nil {
+		if err := printTo(body.Printer, job); err != nil {
 			log.Printf("print failed: %v", err)
 			writeJSON(w, 500, map[string]any{"error": "PRINT_FAILED", "message": err.Error()})
 			return
@@ -96,7 +130,7 @@ func handler(allowed []string) http.Handler {
 		}
 		job, err := hardTestReceipt(1)
 		if err == nil {
-			err = printRaw(body.Printer, job)
+			err = printTo(body.Printer, job)
 		}
 		if err != nil {
 			log.Printf("hard test print failed: %v", err)
@@ -117,7 +151,7 @@ func handler(allowed []string) http.Handler {
 			writeJSON(w, 400, map[string]any{"error": "PRINTER_REQUIRED"})
 			return
 		}
-		if err := printRaw(body.Printer, testReceipt(body.Printer)); err != nil {
+		if err := printTo(body.Printer, testReceipt(body.Printer)); err != nil {
 			log.Printf("print failed: %v", err)
 			writeJSON(w, 500, map[string]any{"error": "PRINT_FAILED", "message": err.Error()})
 			return
@@ -142,7 +176,7 @@ func handler(allowed []string) http.Handler {
 			h.Set("Access-Control-Allow-Origin", origin)
 			h.Set("Vary", "Origin")
 			h.Set("Access-Control-Allow-Headers", "Content-Type")
-			h.Set("Access-Control-Allow-Methods", "GET,POST,OPTIONS")
+			h.Set("Access-Control-Allow-Methods", "GET,POST,DELETE,OPTIONS")
 			h.Set("Access-Control-Allow-Private-Network", "true") // Chrome's preflight for public page -> localhost
 		}
 		if r.Method == http.MethodOptions {
