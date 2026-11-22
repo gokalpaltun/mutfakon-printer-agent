@@ -36,32 +36,9 @@ func testReceipt(printerName string) []byte {
 	for _, l := range []string{"MUTFAK ON", "Test fisi / Test print", printerName, time.Now().Format("02.01.2006 15:04")} {
 		b.WriteString(asciiOnly(l) + "\n")
 	}
-	// Buzzer diagnosis: each line names a buzzer command and is followed by it. Whichever line the printer beeps at is the command
-	// this model understands. (Every one is harmless to a printer that does not know it.)
-	b.WriteString("\nBip testi / Buzzer test\n")
-	for i, v := range buzzerVariants {
-		b.WriteString(fmt.Sprintf("%d) %s\n\n", i+1, v.name))
-		b.Write(v.cmd)
-	}
 	b.WriteString("\n\n\n\n")
 	b.Write([]byte{gs, 0x56, 66, 0}) // feed and partial cut
 	return b.Bytes()
-}
-
-var buzzerVariants = []struct {
-	name string
-	cmd  []byte
-}{
-	{"ESC B 3 3", []byte{esc, 0x42, 3, 3}},
-	{"ESC B 5 9", []byte{esc, 0x42, 5, 9}},
-	{"ESC BEL 3 2 2", []byte{esc, 0x07, 3, 2, 2}},
-	{"ESC BEL 1 20 20", []byte{esc, 0x07, 1, 20, 20}},
-	{"BEL BEL BEL", []byte{0x07, 0x07, 0x07}},
-	{"ESC 7 3 3 3", []byte{esc, 0x37, 3, 3, 3}},
-	{"Drawer pin2 (ESC p 0)", []byte{esc, 0x70, 0, 50, 250}},
-	{"Drawer pin5 (ESC p 1)", []byte{esc, 0x70, 1, 50, 250}},
-	{"Drawer short (ESC p 0 25)", []byte{esc, 0x70, 0, 25, 25}},
-	{"DLE DC4 drawer", []byte{0x10, 0x14, 1, 0, 1}},
 }
 
 // rasterReceipt builds the print job for a receipt that arrives as a 1-bit bitmap (rows of width/8 bytes,
@@ -94,10 +71,4 @@ func rasterReceipt(width, height int, data []byte, copies int) ([]byte, error) {
 		b.Write([]byte{gs, 0x56, 66, 0}) // feed and partial cut
 	}
 	return b.Bytes(), nil
-}
-
-// beepCommand sounds the printer's buzzer (not every model has one; one without it ignores the command): ESC B n t = n beeps
-// of t x 100 ms, the Epson-compatible command most receipt printers understand. Sent before the receipt so it rings as the job starts.
-func beepCommand() []byte {
-	return []byte{esc, 0x42, 3, 3}
 }
