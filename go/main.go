@@ -12,7 +12,7 @@ import (
 	"strings"
 )
 
-const version = "0.3.0"
+const version = "0.4.0"
 
 func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
@@ -109,10 +109,15 @@ func handler(allowed []string) http.Handler {
 			writeJSON(w, 400, map[string]any{"error": "BAD_BITMAP", "message": err.Error()})
 			return
 		}
-		if err := printTo(body.Printer, job); err != nil {
-			log.Printf("print failed: %v", err)
-			writeJSON(w, 500, map[string]any{"error": "PRINT_FAILED", "message": err.Error()})
-			return
+		// The printer's own buzzer sounds whenever a receipt prints: the beep command leads the SAME job. If the printer rejects that
+		// job (no buzzer, dislikes the command), the receipt is sent once more without the beep, so a sound never costs a receipt.
+		if err := printTo(body.Printer, append(beepCommand(), job...)); err != nil {
+			log.Printf("print with beep failed, retrying without it: %v", err)
+			if err := printTo(body.Printer, job); err != nil {
+				log.Printf("print failed: %v", err)
+				writeJSON(w, 500, map[string]any{"error": "PRINT_FAILED", "message": err.Error()})
+				return
+			}
 		}
 		writeJSON(w, 200, map[string]any{"ok": true})
 	})

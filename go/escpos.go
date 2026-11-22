@@ -72,3 +72,9 @@ func rasterReceipt(width, height int, data []byte, copies int) ([]byte, error) {
 	}
 	return b.Bytes(), nil
 }
+
+// beepCommand sounds the printer's buzzer (not every model has one; one without it ignores the command): ESC B n t = n beeps
+// of t x 100 ms, the Epson-compatible command most receipt printers understand. Sent before the receipt so it rings as the job starts.
+func beepCommand() []byte {
+	return []byte{esc, 0x42, 3, 3}
+}
