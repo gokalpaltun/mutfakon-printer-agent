@@ -36,9 +36,27 @@ func testReceipt(printerName string) []byte {
 	for _, l := range []string{"MUTFAK ON", "Test fisi / Test print", printerName, time.Now().Format("02.01.2006 15:04")} {
 		b.WriteString(asciiOnly(l) + "\n")
 	}
+	// Buzzer diagnosis: each line names a buzzer command and is followed by it. Whichever line the printer beeps at is the command
+	// this model understands. (Every one is harmless to a printer that does not know it.)
+	b.WriteString("\nBip testi / Buzzer test\n")
+	for i, v := range buzzerVariants {
+		b.WriteString(fmt.Sprintf("%d) %s\n\n", i+1, v.name))
+		b.Write(v.cmd)
+	}
 	b.WriteString("\n\n\n\n")
 	b.Write([]byte{gs, 0x56, 66, 0}) // feed and partial cut
 	return b.Bytes()
+}
+
+var buzzerVariants = []struct {
+	name string
+	cmd  []byte
+}{
+	{"ESC B 3 3", []byte{esc, 0x42, 3, 3}},
+	{"BEL (07)", []byte{0x07}},
+	{"ESC ( A (Epson)", []byte{esc, 0x28, 0x41, 4, 0, 0x30, 0, 3, 3}},
+	{"ESC 7 3 3 3", []byte{esc, 0x37, 3, 3, 3}},
+	{"Cash drawer pulse", []byte{esc, 0x70, 0, 50, 250}},
 }
 
 // rasterReceipt builds the print job for a receipt that arrives as a 1-bit bitmap (rows of width/8 bytes,
