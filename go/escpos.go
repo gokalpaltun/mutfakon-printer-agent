@@ -53,10 +53,15 @@ var buzzerVariants = []struct {
 	cmd  []byte
 }{
 	{"ESC B 3 3", []byte{esc, 0x42, 3, 3}},
-	{"BEL (07)", []byte{0x07}},
-	{"ESC ( A (Epson)", []byte{esc, 0x28, 0x41, 4, 0, 0x30, 0, 3, 3}},
+	{"ESC B 5 9", []byte{esc, 0x42, 5, 9}},
+	{"ESC BEL 3 2 2", []byte{esc, 0x07, 3, 2, 2}},
+	{"ESC BEL 1 20 20", []byte{esc, 0x07, 1, 20, 20}},
+	{"BEL BEL BEL", []byte{0x07, 0x07, 0x07}},
 	{"ESC 7 3 3 3", []byte{esc, 0x37, 3, 3, 3}},
-	{"Cash drawer pulse", []byte{esc, 0x70, 0, 50, 250}},
+	{"Drawer pin2 (ESC p 0)", []byte{esc, 0x70, 0, 50, 250}},
+	{"Drawer pin5 (ESC p 1)", []byte{esc, 0x70, 1, 50, 250}},
+	{"Drawer short (ESC p 0 25)", []byte{esc, 0x70, 0, 25, 25}},
+	{"DLE DC4 drawer", []byte{0x10, 0x14, 1, 0, 1}},
 }
 
 // rasterReceipt builds the print job for a receipt that arrives as a 1-bit bitmap (rows of width/8 bytes,
